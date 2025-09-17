@@ -87,14 +87,14 @@ export default function App() {
 
             <button
               onClick={takePhoto}
-              className="w-16 h-16 rounded-full bg-white border-4 border-gray-300"
-            ></button>
+              className="w-12 h-12 rounded-full bg-white border-4 border-gray-300"
+            >拍照</button>
 
             <button
               onClick={switchCamera}
               className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white"
             >
-              🔄
+              翻轉
             </button>
           </div>
 
