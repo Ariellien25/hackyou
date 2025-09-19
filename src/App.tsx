@@ -57,7 +57,11 @@ export default function App() {
 
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
+
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
     setPhoto(canvas.toDataURL("image/png"));
   };
 
@@ -72,7 +76,7 @@ export default function App() {
           ref={videoRef}
           autoPlay
           playsInline
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transform -scale-x-100"
         />
 
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/50 text-white px-4 py-2 rounded-full text-lg font-medium">
