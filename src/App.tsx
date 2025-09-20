@@ -20,7 +20,7 @@ export default function App() {
 
   const [sessionId, setSessionId] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [message, setMessage] = useState("準備好拍照吧！");
+  const [message, setMessage] = useState("與 Gemini API 連接中 ...");
   const [photo, setPhoto] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [showGrid, setShowGrid] = useState(true);

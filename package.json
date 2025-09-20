@@ -35,5 +35,5 @@
     "not ie <= 11",
     "not op_mini all"
   ],
-  "proxy": "http://localhost:8080"
+  "proxy": "https://hackyou-backend-104787397649.asia-east1.run.app"
 }
