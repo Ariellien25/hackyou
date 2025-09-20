@@ -121,8 +121,7 @@ export default function App() {
     canvas.height = h;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    if (facingMode === "user") ctx.setTransform(-1, 0, 0, 1, w, 0);
-    else ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(video, 0, 0, w, h);
     const base64 = canvas.toDataURL("image/jpeg", 0.6).split(",")[1];
     ws.send(JSON.stringify({ type: "frame", ts: Date.now(), content_type: "image/jpeg", shape: [h, w], bytes: base64 }));
@@ -195,8 +194,7 @@ export default function App() {
     if (!ctx) return;
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     setPhoto(canvas.toDataURL("image/png"));
   };
