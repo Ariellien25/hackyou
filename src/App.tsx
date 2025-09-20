@@ -4,7 +4,8 @@ import { useRef, useState, useEffect } from "react";
 //   ((process.env as any)?.REACT_APP_API_BASE as string) ||
 //   "";
 // const API_BASE = "http://localhost:8080"
-const API_BASE = "https://api.hackyou.steveyi.net"
+// const API_BASE = "https://api.hackyou.steveyi.net"
+const API_BASE = "https://hackyou-backend-104787397649.asia-east1.run.app"
 
 export default function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
