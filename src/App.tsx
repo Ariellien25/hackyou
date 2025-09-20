@@ -13,38 +13,88 @@ export default function App() {
   const startingRef = useRef(false);
   const wsConnectingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const [sessionId, setSessionId] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [message, setMessage] = useState("Connecting with Gemini API ...");
+  const [message, setMessage] = useState("與 Gemini API 連接中 ...");
   const [photo, setPhoto] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [showGrid, setShowGrid] = useState(true);
+
   const [audioReady, setAudioReady] = useState(false);
+  const [voiceReady, setVoiceReady] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
   const [subtitlePos, setSubtitlePos] = useState<{ x: number; y: number }>({ x: 215, y: 430 });
   const [dragState, setDragState] = useState<{ active: boolean; dx: number; dy: number; id?: number }>({ active: false, dx: 0, dy: 0 });
 
+  const pickEnVoice = (voices: SpeechSynthesisVoice[]) => {
+    return (
+      voices.find(v => v.lang?.toLowerCase().startsWith("en-us")) ||
+      voices.find(v => v.lang?.toLowerCase().startsWith("en-gb")) ||
+      voices.find(v => v.lang?.toLowerCase().startsWith("en")) ||
+      voices[0] ||
+      null
+    );
+  };
+
   const enableAudio = async () => {
-    if (audioReady) return;
     try {
       const Ctx: any = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!Ctx) return;
-      const ctx = (audioCtxRef.current ??= new Ctx()) as AudioContext;
-      await ctx.resume();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      gain.gain.value = 0.0001;
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.02);
+      if (Ctx) {
+        const ctx = (audioCtxRef.current ??= new Ctx()) as AudioContext;
+        if (ctx.state === "suspended") await ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.0001;
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.02);
+        setAudioReady(true);
+      }
+
+      const ensureVoicesNow = () =>
+        new Promise<SpeechSynthesisVoice[]>((resolve) => {
+          const got = window.speechSynthesis.getVoices();
+          if (got && got.length) return resolve(got);
+          const onChange = () => {
+            window.speechSynthesis.removeEventListener("voiceschanged", onChange);
+            resolve(window.speechSynthesis.getVoices());
+          };
+          window.speechSynthesis.addEventListener("voiceschanged", onChange);
+          setTimeout(() => resolve(window.speechSynthesis.getVoices()), 600);
+        });
+
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance("。");
-      u.lang = "en";
-      u.volume = 0;
-      window.speechSynthesis.speak(u);
-      setAudioReady(true);
-    } catch { }
+      const pre = new SpeechSynthesisUtterance(" ");
+      pre.volume = 0;
+      window.speechSynthesis.speak(pre);
+
+      const voices = await ensureVoicesNow();
+      voiceRef.current = pickEnVoice(voices);
+      setVoiceReady(!!voices.length);
+
+      const test = new SpeechSynthesisUtterance("This is a test voice");
+      if (voiceRef.current) test.voice = voiceRef.current;
+      test.lang = voiceRef.current?.lang || "en-US";
+      test.rate = 1;
+      test.pitch = 1;
+      test.volume = 1;
+      window.speechSynthesis.speak(test);
+    } catch {}
+  };
+
+  const speakLocal = (text: string) => {
+    if (!audioReady) return;
+    const u = new SpeechSynthesisUtterance(text);
+    if (voiceRef.current) u.voice = voiceRef.current;
+    u.lang = voiceRef.current?.lang || "en-US";
+    u.rate = 1;
+    u.pitch = 1;
+    u.volume = 1;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
   };
 
   const startCamera = async (mode: "user" | "environment") => {
@@ -76,14 +126,6 @@ export default function App() {
     startingRef.current = false;
   };
 
-  const speakLocal = (text: string) => {
-    if (!audioReady) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "zh-TW";
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
-  };
-
   const openSessionAndWS = async () => {
     if (wsConnectingRef.current) return;
     wsConnectingRef.current = true;
@@ -103,7 +145,7 @@ export default function App() {
       setSessionId(data.session_id || "");
       const wsUrl = String(data.ws_url || "").replace(/^http/, "ws");
       if (!wsUrl) return;
-      if (wsRef.current) try { wsRef.current.close(); } catch { }
+      if (wsRef.current) try { wsRef.current.close(); } catch {}
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       ws.onmessage = async e => {
@@ -114,7 +156,7 @@ export default function App() {
         }
       };
       ws.onclose = () => { wsRef.current = null; };
-    } catch { }
+    } catch {}
     finally {
       wsConnectingRef.current = false;
     }
@@ -206,21 +248,15 @@ export default function App() {
     const h = video.videoHeight;
     canvas.width = w;
     canvas.height = h;
-
     ctx.clearRect(0, 0, w, h);
-
     if (facingMode === "user") {
-      // 前鏡頭 → 水平翻轉
       ctx.setTransform(-1, 0, 0, 1, w, 0);
     } else {
-      // 後鏡頭 → 不翻轉
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
-
     ctx.drawImage(video, 0, 0, w, h);
     setPhoto(canvas.toDataURL("image/png", 1.0));
   };
-
 
   const switchCamera = () => {
     setFacingMode(p => (p === "user" ? "environment" : "user"));
@@ -273,7 +309,7 @@ export default function App() {
 
         <div className="absolute right-3 top-3 flex flex-col gap-2 z-10">
           <button onClick={() => snapSubtitle("top")} className="px-3 py-1 rounded bg-white/10 text-white text-xs">頂部</button>
-          <button onClick={() => snapSubtitle("center")} className="px-3 py-1 rounded bg-white/10 text-white text-xs">置中</button>
+          <button onClick={() => snapSubtitle("center")} className="px-3 py-1 rounded bg白/10 text-white text-xs">置中</button>
           <button onClick={() => snapSubtitle("bottom")} className="px-3 py-1 rounded bg-white/10 text-white text-xs">底部</button>
         </div>
 
@@ -289,17 +325,15 @@ export default function App() {
 
         <div className="absolute bottom-0 w-full bg-black/80 flex flex-col items-center py-4">
           <div className="flex justify-between w-3/4 items-center mb-3 gap-3">
+            <button className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">✕</button>
             <button onClick={takePhoto} className="w-12 h-12 rounded-full bg-white border-4 border-gray-300">拍照</button>
             <button onClick={switchCamera} className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">翻轉</button>
             <button onClick={() => setShowGrid(v => !v)} className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">
               {showGrid ? "格" : "無"}
             </button>
-            <button onClick={enableAudio} disabled={audioReady} className={`px-3 py-1 rounded-full ${audioReady ? "bg-green-600 text-white" : "bg-blue-600 text-white"} disabled:opacity-60`}>
-              {audioReady ? "聲音已啟用" : "啟用聲音"}
-            </button>
-            <button onClick={() => speakLocal("這是一段測試語音")} text-white>
-              測試語音
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={enableAudio} className="px-3 py-1 rounded-full bg-blue-600 text-white">啟用聲音</button>
+            </div>
           </div>
           <div className="flex gap-4 items-center text-gray-300 text-sm">
             <span className="text-white font-bold">相機</span>
@@ -307,9 +341,9 @@ export default function App() {
         </div>
 
         {photo && (
-          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center">
+          <div className="absolute inset-0 bg-black/90 flex flex奧 items-center justify-center">
             <img src={photo} alt="snapshot" className="max-h-[80%] rounded-lg shadow-lg" />
-            <button className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg shadow hover:bg-blue-700" onClick={() => setPhoto(null)}>
+            <button className="mt-4 bg-blue-600 text白 px-6 py-2 rounded-lg shadow hover:bg-blue-700" onClick={() => setPhoto(null)}>
               返回相機
             </button>
           </div>
