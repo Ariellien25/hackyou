@@ -213,6 +213,26 @@ export default function App() {
     setFacingMode(p => (p === "user" ? "environment" : "user"));
   };
 
+  const [audioReady, setAudioReady] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const enableAudio = async () => {
+    if (audioReady) return;
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
+      await audioCtxRef.current.resume();
+      const ctx = audioCtxRef.current;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.01);
+      setAudioReady(true);
+    } catch { }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-800">
       <div className="relative w-[430px] h-[860px] bg-black rounded-[3rem] shadow-2xl overflow-hidden border-[14px] border-gray-900">
@@ -244,8 +264,21 @@ export default function App() {
             <span>肖像</span>
             <span>夜視</span>
             <label className="flex items-center gap-2 ml-4">
-              <input type="checkbox" checked={useCloudTTS} onChange={e => setUseCloudTTS(e.target.checked)} />
-              <span>雲端語音</span>
+              <div className="flex items-center gap-2 ml-4">
+                <button
+                  onClick={enableAudio}
+                  disabled={audioReady}
+                  className={`px-3 py-1 rounded-full ${audioReady ? "bg-green-600 text-white" : "bg-blue-600 text-white"} disabled:opacity-60`}
+                >
+                  {audioReady ? "聲音已啟用" : "啟用聲音"}
+                </button>
+                <button
+                  onClick={() => setUseCloudTTS(v => !v)}
+                  className={`px-3 py-1 rounded-full ${useCloudTTS ? "bg-purple-600 text-white" : "bg-gray-600 text-white"}`}
+                >
+                  {useCloudTTS ? "雲端語音" : "本機語音"}
+                </button>
+              </div>
             </label>
           </div>
         </div>
