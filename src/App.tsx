@@ -1,11 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 
-// const API_BASE =
-//   ((process.env as any)?.REACT_APP_API_BASE as string) ||
-//   "";
-// const API_BASE = "http://localhost:8080"
-// const API_BASE = "https://api.hackyou.steveyi.net"
-const API_BASE = "https://hackyou-backend-104787397649.asia-east1.run.app"
+const API_BASE = "https://hackyou-backend-104787397649.asia-east1.run.app";
 
 export default function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -17,6 +12,8 @@ export default function App() {
   const startedRef = useRef(false);
   const startingRef = useRef(false);
   const wsConnectingRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const [sessionId, setSessionId] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -24,7 +21,31 @@ export default function App() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [showGrid, setShowGrid] = useState(true);
-  const [useCloudTTS, setUseCloudTTS] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
+  const [subtitlePos, setSubtitlePos] = useState<{ x: number; y: number }>({ x: 215, y: 430 });
+  const [dragState, setDragState] = useState<{ active: boolean; dx: number; dy: number; id?: number }>({ active: false, dx: 0, dy: 0 });
+
+  const enableAudio = async () => {
+    if (audioReady) return;
+    try {
+      const Ctx: any = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = (audioCtxRef.current ??= new Ctx()) as AudioContext;
+      await ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.02);
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance("。");
+      u.lang = "zh-TW";
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+      setAudioReady(true);
+    } catch { }
+  };
 
   const startCamera = async (mode: "user" | "environment") => {
     if (startingRef.current) return;
@@ -35,11 +56,7 @@ export default function App() {
       streamRef.current = null;
     }
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: mode,
-        width: { ideal: 1920 },  // Full HD
-        height: { ideal: 1080 }
-      },
+      video: { facingMode: mode, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false
     });
     if (token !== startTokenRef.current) {
@@ -60,24 +77,11 @@ export default function App() {
   };
 
   const speakLocal = (text: string) => {
+    if (!audioReady) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "zh-TW";
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
-  };
-
-  const speakCloud = async (text: string) => {
-    if (!sessionId) return;
-    const r = await fetch(`${API_BASE}/v1/tts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, text, voice: "zh-TW-Wavenet-A", speed: 1.0, pitch: 0.0, format: "mp3", cache: true })
-    });
-    if (!r.ok) return;
-    const j = await r.json();
-    if (!j?.audio_url) return;
-    const a = new Audio(j.audio_url);
-    try { await a.play(); } catch { }
   };
 
   const openSessionAndWS = async () => {
@@ -106,8 +110,7 @@ export default function App() {
         const msg = JSON.parse(e.data);
         if (msg?.type === "tip" && typeof msg.text === "string") {
           setMessage(msg.text);
-          if (useCloudTTS) await speakCloud(msg.text);
-          else speakLocal(msg.text);
+          speakLocal(msg.text);
         }
       };
       ws.onclose = () => { wsRef.current = null; };
@@ -149,7 +152,7 @@ export default function App() {
   useEffect(() => {
     if (!streaming) return;
     openSessionAndWS();
-  }, [streaming, facingMode, useCloudTTS]);
+  }, [streaming, facingMode]);
 
   useEffect(() => {
     if (!streaming) return;
@@ -203,8 +206,8 @@ export default function App() {
     const h = video.videoHeight;
     canvas.width = w;
     canvas.height = h;
-    if (facingMode === "user") ctx.setTransform(-1, 0, 0, 1, w, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
     ctx.drawImage(video, 0, 0, w, h);
     setPhoto(canvas.toDataURL("image/png", 1.0));
   };
@@ -213,29 +216,39 @@ export default function App() {
     setFacingMode(p => (p === "user" ? "environment" : "user"));
   };
 
-  const [audioReady, setAudioReady] = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-
-  const enableAudio = async () => {
-    if (audioReady) return;
-    try {
-      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
-      await audioCtxRef.current.resume();
-      const ctx = audioCtxRef.current;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      gain.gain.value = 0.0001;
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.01);
-      setAudioReady(true);
-    } catch { }
+  const onSubtitlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    setDragState({ active: true, dx: e.clientX - subtitlePos.x, dy: e.clientY - subtitlePos.y, id: e.pointerId });
+  };
+  const onSubtitlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragState.active) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    let x = e.clientX - dragState.dx;
+    let y = e.clientY - dragState.dy;
+    if (rect) {
+      x = Math.max(0, Math.min(rect.width, x));
+      y = Math.max(0, Math.min(rect.height, y));
+    }
+    setSubtitlePos({ x, y });
+  };
+  const onSubtitlePointerUp = () => {
+    setDragState({ active: false, dx: 0, dy: 0 });
+  };
+  const snapSubtitle = (pos: "top" | "center" | "bottom") => {
+    const w = containerRef.current?.clientWidth ?? 430;
+    const h = containerRef.current?.clientHeight ?? 860;
+    if (pos === "top") setSubtitlePos({ x: w / 2, y: h * 0.15 });
+    else if (pos === "center") setSubtitlePos({ x: w / 2, y: h / 2 });
+    else setSubtitlePos({ x: w / 2, y: h * 0.85 });
   };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-800">
-      <div className="relative w-[430px] h-[860px] bg-black rounded-[3rem] shadow-2xl overflow-hidden border-[14px] border-gray-900">
+      <div
+        ref={containerRef}
+        className="relative w-[430px] h-[860px] bg-black rounded-[3rem] shadow-2xl overflow-hidden border-[14px] border-gray-900"
+      >
         <video
           ref={videoRef}
           autoPlay
@@ -247,41 +260,40 @@ export default function App() {
         <div className="absolute top-4 left-4 text-xs text-white/70 px-2 py-1 bg-white/10 rounded">
           {sessionId ? sessionId.slice(0, 12) + "..." : "建立連線中"}
         </div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/50 text-white px-4 py-2 rounded-full text-lg font-medium">
+
+        <div className="absolute right-3 top-3 flex flex-col gap-2 z-10">
+          <button onClick={() => snapSubtitle("top")} className="px-3 py-1 rounded bg-white/10 text-white text-xs">頂部</button>
+          <button onClick={() => snapSubtitle("center")} className="px-3 py-1 rounded bg-white/10 text-white text-xs">置中</button>
+          <button onClick={() => snapSubtitle("bottom")} className="px-3 py-1 rounded bg-white/10 text-white text-xs">底部</button>
+        </div>
+
+        <div
+          onPointerDown={onSubtitlePointerDown}
+          onPointerMove={onSubtitlePointerMove}
+          onPointerUp={onSubtitlePointerUp}
+          className="absolute bg-black/50 text-white px-4 py-2 rounded-full text-lg font-medium cursor-move select-none"
+          style={{ left: subtitlePos.x, top: subtitlePos.y, transform: "translate(-50%,-50%)" }}
+        >
           {message}
         </div>
-        <div className="absolute bottom-0 w-full bg黑/80 flex flex-col items-center py-4">
+
+        <div className="absolute bottom-0 w-full bg-black/80 flex flex-col items-center py-4">
           <div className="flex justify-between w-3/4 items-center mb-3 gap-3">
             <button className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">✕</button>
             <button onClick={takePhoto} className="w-12 h-12 rounded-full bg-white border-4 border-gray-300">拍照</button>
             <button onClick={switchCamera} className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">翻轉</button>
-            <button onClick={() => setShowGrid(v => !v)} className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text白">
+            <button onClick={() => setShowGrid(v => !v)} className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">
               {showGrid ? "格" : "無"}
+            </button>
+            <button onClick={enableAudio} disabled={audioReady} className={`px-3 py-1 rounded-full ${audioReady ? "bg-green-600 text-white" : "bg-blue-600 text-white"} disabled:opacity-60`}>
+              {audioReady ? "聲音已啟用" : "啟用聲音"}
             </button>
           </div>
           <div className="flex gap-4 items-center text-gray-300 text-sm">
-            <span className="text-white font-bold">相片</span>
-            <span>肖像</span>
-            <span>夜視</span>
-            <label className="flex items-center gap-2 ml-4">
-              <div className="flex items-center gap-2 ml-4">
-                <button
-                  onClick={enableAudio}
-                  disabled={audioReady}
-                  className={`px-3 py-1 rounded-full ${audioReady ? "bg-green-600 text-white" : "bg-blue-600 text-white"} disabled:opacity-60`}
-                >
-                  {audioReady ? "聲音已啟用" : "啟用聲音"}
-                </button>
-                <button
-                  onClick={() => setUseCloudTTS(v => !v)}
-                  className={`px-3 py-1 rounded-full ${useCloudTTS ? "bg-purple-600 text-white" : "bg-gray-600 text-white"}`}
-                >
-                  {useCloudTTS ? "雲端語音" : "本機語音"}
-                </button>
-              </div>
-            </label>
+            <span className="text-white font-bold">相機</span>
           </div>
         </div>
+
         {photo && (
           <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center">
             <img src={photo} alt="snapshot" className="max-h-[80%] rounded-lg shadow-lg" />
