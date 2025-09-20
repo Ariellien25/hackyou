@@ -206,11 +206,21 @@ export default function App() {
     const h = video.videoHeight;
     canvas.width = w;
     canvas.height = h;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
     ctx.clearRect(0, 0, w, h);
+
+    if (facingMode === "user") {
+      // 前鏡頭 → 水平翻轉
+      ctx.setTransform(-1, 0, 0, 1, w, 0);
+    } else {
+      // 後鏡頭 → 不翻轉
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
     ctx.drawImage(video, 0, 0, w, h);
     setPhoto(canvas.toDataURL("image/png", 1.0));
   };
+
 
   const switchCamera = () => {
     setFacingMode(p => (p === "user" ? "environment" : "user"));
