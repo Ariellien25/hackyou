@@ -203,6 +203,7 @@ export default function App() {
     const h = video.videoHeight;
     canvas.width = w;
     canvas.height = h;
+    if (facingMode === "user") ctx.setTransform(-1, 0, 0, 1, w, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(video, 0, 0, w, h);
     setPhoto(canvas.toDataURL("image/png", 1.0));
