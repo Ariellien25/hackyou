@@ -34,7 +34,14 @@ export default function App() {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: mode,
+        width: { ideal: 1920 },  // Full HD
+        height: { ideal: 1080 }
+      },
+      audio: false
+    });
     if (token !== startTokenRef.current) {
       stream.getTracks().forEach(t => t.stop());
       startingRef.current = false;
@@ -192,14 +199,13 @@ export default function App() {
     if (!video || !canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const w = video.videoWidth || 640;
-    const h = video.videoHeight || 480;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
     canvas.width = w;
     canvas.height = h;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, w, h);
     ctx.drawImage(video, 0, 0, w, h);
-    setPhoto(canvas.toDataURL("image/png"));
+    setPhoto(canvas.toDataURL("image/png", 1.0));
   };
 
   const switchCamera = () => {
