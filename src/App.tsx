@@ -192,10 +192,13 @@ export default function App() {
     if (!video || !canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const w = video.videoWidth || 640;
+    const h = video.videoHeight || 480;
+    canvas.width = w;
+    canvas.height = h;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(video, 0, 0, w, h);
     setPhoto(canvas.toDataURL("image/png"));
   };
 
