@@ -17,7 +17,7 @@ export default function App() {
 
   const [sessionId, setSessionId] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [message, setMessage] = useState("與 Gemini API 連接中 ...");
+  const [message, setMessage] = useState("Connecting with Gemini API ...");
   const [photo, setPhoto] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [showGrid, setShowGrid] = useState(true);
@@ -40,7 +40,7 @@ export default function App() {
       osc.stop(ctx.currentTime + 0.02);
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance("。");
-      u.lang = "zh-TW";
+      u.lang = "en";
       u.volume = 0;
       window.speechSynthesis.speak(u);
       setAudioReady(true);
