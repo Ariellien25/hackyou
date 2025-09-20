@@ -289,7 +289,6 @@ export default function App() {
 
         <div className="absolute bottom-0 w-full bg-black/80 flex flex-col items-center py-4">
           <div className="flex justify-between w-3/4 items-center mb-3 gap-3">
-            <button className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">✕</button>
             <button onClick={takePhoto} className="w-12 h-12 rounded-full bg-white border-4 border-gray-300">拍照</button>
             <button onClick={switchCamera} className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">翻轉</button>
             <button onClick={() => setShowGrid(v => !v)} className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-white">
@@ -297,6 +296,9 @@ export default function App() {
             </button>
             <button onClick={enableAudio} disabled={audioReady} className={`px-3 py-1 rounded-full ${audioReady ? "bg-green-600 text-white" : "bg-blue-600 text-white"} disabled:opacity-60`}>
               {audioReady ? "聲音已啟用" : "啟用聲音"}
+            </button>
+            <button onClick={() => speakLocal("這是一段測試語音")} text-white>
+              測試語音
             </button>
           </div>
           <div className="flex gap-4 items-center text-gray-300 text-sm">
